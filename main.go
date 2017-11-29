@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"time"
+	"strings"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -119,7 +120,7 @@ func main() {
 	year, month, day := time.Now().Date()
 	today_start := time.Date(year, month, day, 00, 00, 00, 0, time.Local).Format(time.RFC3339)
 	today_end := time.Date(year, month, day, 23, 59, 59, 0, time.Local).Format(time.RFC3339)
-	
+
 	// 指定したカレンダーIDの情報取得
 	events, err := srv.Events.
 		List(CALENDAR_ID).
@@ -133,8 +134,13 @@ func main() {
 		log.Fatalf("Unable to retrieve next ten of the user's events. %v", err)
 	}
 
+	var when string
+	
+	name := "吉村朋子"
+	flag := false
+	var event *calendar.Event
+
 	for _, i := range events.Items {
-		var when string
 		// If the DateTime is an empty string the Event is an all-day Event.
 		// So only Date is available.
 		if i.Start.DateTime != "" {
@@ -142,6 +148,37 @@ func main() {
 		} else {
 			when = i.Start.Date
 		}
-		fmt.Printf("event: (%s): %q\n", when, i.Summary)
+		if strings.Contains(rmSpace(i.Summary), rmSpace(name)) {
+			flag = true
+			event = i
+		}
+	}
+
+	if flag == true {
+		fmt.Printf("event: (%s): %q\n", when, event.Summary)
+	} else {
+		fmt.Println("本日のシフトはありません")
+	}
+	
+	pure_data(events,when)
+}
+
+func rmSpace(str string ) (summary string) {
+	return strings.Replace(str," ", "", -1)
+}
+
+func pure_data(events *calendar.Events, when string) {
+	fmt.Println("pure_data")
+	for _, i := range events.Items {
+		// If the DateTime is an empty string the Event is an all-day Event.
+		// So only Date is available.
+		if i.Start.DateTime != "" {
+			when = i.Start.DateTime
+		} else {
+			when = i.Start.Date
+		}
+		fmt.Printf("event: (%s): %q\n", when, rmSpace(i.Summary))
 	}
 }
+
+
