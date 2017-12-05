@@ -12,16 +12,21 @@ import (
 	"path/filepath"
 	"time"
 	"strings"
-
+	"github.com/BurntSushi/toml"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
 )
 
-const (
-	CALENDAR_ID string = "n5cda37c0n6393i6geshji5gck@group.calendar.google.com"
-)
+type Config struct {
+	User UserConfig
+}
+
+type UserConfig struct {
+	CalendarID string
+	Name string
+}
 
 // getClient uses a Context and Config to retrieve a Token
 // then generate a Client. It returns the generated Client.
@@ -96,6 +101,14 @@ func saveToken(file string, token *oauth2.Token) {
 }
 
 func main() {
+	var conf Config
+	_, err := toml.DecodeFile("./config.toml", &conf)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+
+	fmt.Println(conf.User.Name)
+
 	ctx := context.Background()
 
 	b, err := ioutil.ReadFile("client_secret.json")
@@ -123,7 +136,7 @@ func main() {
 
 	// 指定したカレンダーIDの情報取得
 	events, err := srv.Events.
-		List(CALENDAR_ID).
+		List(conf.User.CalendarID).
 		ShowDeleted(false).
 		SingleEvents(true).
 		TimeMin(today_start).
@@ -135,8 +148,7 @@ func main() {
 	}
 
 	var when string
-	
-	name := "吉村朋子"
+	name := conf.User.Name
 	flag := false
 	var event *calendar.Event
 
@@ -165,6 +177,11 @@ func main() {
 
 func rmSpace(str string ) (summary string) {
 	return strings.Replace(str," ", "", -1)
+}
+
+
+func getSame(){
+
 }
 
 func pure_data(events *calendar.Events, when string) {
