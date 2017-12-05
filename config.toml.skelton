@@ -1,4 +1,7 @@
 [User]
-calendarID  = ""
-canteraName = "saga"
-userName    = ""
+canteraName =       "saga"  // "12-13-00-saga.md"のsagaの部分
+userName    =       ""      // google calendarに登録したあなたの名前
+
+[Env]
+calendarID  =       ""      // 別途展開
+authorizationCode = ""      // url.txtのURLアクセスで表示されるコードを記入する

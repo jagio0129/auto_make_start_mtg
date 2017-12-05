@@ -21,24 +21,29 @@ import (
 
 type Config struct {
 	User UserConfig
+	Env  EnvConfig
 }
 
 type UserConfig struct {
-	CalendarID  string
 	CanteraName string
 	UserName    string
 }
 
+type EnvConfig struct {
+	CalendarID        string
+	AuthorizationCode string
+}
+
 // getClient uses a Context and Config to retrieve a Token
 // then generate a Client. It returns the generated Client.
-func getClient(ctx context.Context, config *oauth2.Config) *http.Client {
+func getClient(ctx context.Context, config *oauth2.Config, conf Config) *http.Client {
 	cacheFile, err := tokenCacheFile()
 	if err != nil {
 		log.Fatalf("Unable to get path to cached credential file. %v", err)
 	}
 	tok, err := tokenFromFile(cacheFile)
 	if err != nil {
-		tok = getTokenFromWeb(config)
+		tok = getTokenFromWeb(config, conf)
 		saveToken(cacheFile, tok)
 	}
 	return config.Client(ctx, tok)
@@ -46,18 +51,28 @@ func getClient(ctx context.Context, config *oauth2.Config) *http.Client {
 
 // getTokenFromWeb uses Config to request a Token.
 // It returns the retrieved Token.
-func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+func getTokenFromWeb(config *oauth2.Config, conf Config) *oauth2.Token {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("Go to the following link in your browser then type the "+
-		"authorization code: \n%v\n", authURL)
+	//fmt.Printf("Go to the following link in your browser then type the "+
+	//	"authorization code: \n%v\n", authURL)
+	if conf.Env.AuthorizationCode == "" {
+		fmt.Println("url.txtファイルに記載されいるURLにアクセスし、表示されるコードをconfig.tomlのauthorizationCodeに記入してください。")
+		file, err := os.OpenFile("./url.txt", os.O_RDWR|os.O_CREATE, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
 
-	var code string
-	if _, err := fmt.Scan(&code); err != nil {
-		log.Fatalf("Unable to read authorization code %v", err)
+		fmt.Fprintln(file, authURL) //書き込み
+		time.Sleep(5 * time.Second)
+		log.Fatal("終了")
 	}
 
-	tok, err := config.Exchange(oauth2.NoContext, code)
+	tok, err := config.Exchange(oauth2.NoContext, conf.Env.AuthorizationCode)
 	if err != nil {
+		fmt.Println("config.tomlのauthorizationCodeが正しく設定されていません。")
+		fmt.Println("url.txtファイルに記載されいるURLにアクセスし、表示されるコードをconfig.tomlのauthorizationCodeに記入してください。")
+		time.Sleep(3 * time.Second)
 		log.Fatalf("Unable to retrieve token from web %v", err)
 	}
 	return tok
@@ -130,7 +145,6 @@ func showMembersOfDay(events *calendar.Events, when string) {
 }
 
 /*ファイルの作成
-
 params
 	filePath: ファイルの保存場所
 	fileName: ファイルの名前(ex 09-13-00-saga.md)
@@ -147,19 +161,51 @@ func mkFile(filePath string, fileName string, txt string) {
 }
 
 /*ファイル名の作成
-
 params
 	cateraName: 所属(ex saga, kyukodai)
 	myStart   : ユーザのシフト開始時間
 return
 	fileName  : ファイルの名前(ex 09-13-00-saga.md)
 */
-func mkFileName(canteraName string, myStart string) string {
+func mkFileName(filePath string, canteraName string, myStart string) string {
 	t, _ := time.Parse("2006-01-02T15:04:05+09:00", myStart)
 	newT := t.Format("02-15-04")
-	fileName := newT + "-" + canteraName + ".md"
+	fileName := filePath + "\\Desktop\\" + newT + "-" + canteraName + ".md"
 	fmt.Println("File name :", fileName)
 	return fileName
+}
+
+/* ファイル内容を定義
+# メンバ
+- [name]
+...
+
+# タスク内容
+- [name]
+	- [context]
+...
+
+# 共有事項
+*/
+func mkTxt(membList []string) string {
+	var txt string
+
+	txt = "# メンバ\n"
+	for _, v := range membList {
+		txt += "  - " + v + "\n"
+	}
+
+	txt += "\n"
+	txt += "# タスク内容\n"
+	for _, v := range membList {
+		txt += "  - " + v + "\n"
+		txt += "    - \n"
+	}
+
+	txt += "\n"
+	txt += "# 共有事項\n"
+
+	return txt
 }
 
 func main() {
@@ -168,9 +214,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
-
-	fmt.Println("名前:", conf.User.UserName)
-	fmt.Println("所属:", conf.User.CanteraName)
 
 	ctx := context.Background()
 
@@ -185,7 +228,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	client := getClient(ctx, config)
+	client := getClient(ctx, config, conf)
 
 	srv, err := calendar.New(client)
 	if err != nil {
@@ -199,7 +242,7 @@ func main() {
 
 	// 指定したカレンダーIDの情報取得
 	events, err := srv.Events.
-		List(conf.User.CalendarID).
+		List(conf.Env.CalendarID).
 		ShowDeleted(false).
 		SingleEvents(true).
 		TimeMin(today_start).
@@ -210,9 +253,20 @@ func main() {
 		log.Fatalf("Unable to retrieve next ten of the user's events. %v", err)
 	}
 
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(usr.HomeDir)
+
 	var when string
 	name := conf.User.UserName
 	canteraName := conf.User.CanteraName
+	filePath := usr.HomeDir
+	if err != nil {
+		log.Fatal(err)
+	}
 	flag := false
 	var event *calendar.Event
 
@@ -236,9 +290,11 @@ func main() {
 		fmt.Println("本日のシフトはありません")
 	}
 
-	//mem := getSameMem(events, event.Start.DateTime)
-	fileName := mkFileName(canteraName, event.Start.DateTime)
-	fmt.Println(fileName)
+	mem := getSameMem(events, event.Start.DateTime)
+
+	fileName := mkFileName(filePath, canteraName, event.Start.DateTime)
+	txt := mkTxt(mem)
+	mkFile(filePath, fileName, txt)
 
 	//showMembersOfDay(events,when)
 }
