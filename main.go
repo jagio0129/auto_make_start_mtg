@@ -3,6 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/BurntSushi/toml"
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/calendar/v3"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,13 +15,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"time"
 	"strings"
-	"github.com/BurntSushi/toml"
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/calendar/v3"
+	"time"
 )
 
 type Config struct {
@@ -24,8 +24,9 @@ type Config struct {
 }
 
 type UserConfig struct {
-	CalendarID string
-	Name string
+	CalendarID  string
+	CanteraName string
+	UserName    string
 }
 
 // getClient uses a Context and Config to retrieve a Token
@@ -100,17 +101,18 @@ func saveToken(file string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func rmSpace(str string ) (summary string) {
-	return strings.Replace(str," ", "", -1)
+func rmSpace(str string) (summary string) {
+	return strings.Replace(str, " ", "", -1)
 }
 
-
-func getSameMem(events *calendar.Events, myStart string){
+func getSameMem(events *calendar.Events, myStart string) []string {
+	var sameMem []string
 	for _, i := range events.Items {
 		if i.Start.DateTime == myStart {
-			fmt.Printf("same: %q\n", rmSpace(i.Summary))
+			sameMem = append(sameMem, i.Summary)
 		}
 	}
+	return sameMem
 }
 
 func showMembersOfDay(events *calendar.Events, when string) {
@@ -127,6 +129,38 @@ func showMembersOfDay(events *calendar.Events, when string) {
 	}
 }
 
+/*ファイルの作成
+
+params
+	filePath: ファイルの保存場所
+	fileName: ファイルの名前(ex 09-13-00-saga.md)
+	txt:      ファイルの内容
+*/
+func mkFile(filePath string, fileName string, txt string) {
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	fmt.Fprintln(file, txt) //書き込み
+}
+
+/*ファイル名の作成
+
+params
+	cateraName: 所属(ex saga, kyukodai)
+	myStart   : ユーザのシフト開始時間
+return
+	fileName  : ファイルの名前(ex 09-13-00-saga.md)
+*/
+func mkFileName(canteraName string, myStart string) string {
+	t, _ := time.Parse("2006-01-02T15:04:05+09:00", myStart)
+	newT := t.Format("02-15-04")
+	fileName := newT + "-" + canteraName + ".md"
+	fmt.Println("File name :", fileName)
+	return fileName
+}
 
 func main() {
 	var conf Config
@@ -135,7 +169,8 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	fmt.Println(conf.User.Name)
+	fmt.Println("名前:", conf.User.UserName)
+	fmt.Println("所属:", conf.User.CanteraName)
 
 	ctx := context.Background()
 
@@ -176,7 +211,8 @@ func main() {
 	}
 
 	var when string
-	name := conf.User.Name
+	name := conf.User.UserName
+	canteraName := conf.User.CanteraName
 	flag := false
 	var event *calendar.Event
 
@@ -200,10 +236,9 @@ func main() {
 		fmt.Println("本日のシフトはありません")
 	}
 
-	getSameMem(events, event.Start.DateTime)
-	
-	showMembersOfDay(events,when)
+	//mem := getSameMem(events, event.Start.DateTime)
+	fileName := mkFileName(canteraName, event.Start.DateTime)
+	fmt.Println(fileName)
+
+	//showMembersOfDay(events,when)
 }
-
-
-
