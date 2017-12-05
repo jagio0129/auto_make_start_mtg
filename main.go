@@ -100,6 +100,34 @@ func saveToken(file string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+func rmSpace(str string ) (summary string) {
+	return strings.Replace(str," ", "", -1)
+}
+
+
+func getSameMem(events *calendar.Events, myStart string){
+	for _, i := range events.Items {
+		if i.Start.DateTime == myStart {
+			fmt.Printf("same: %q\n", rmSpace(i.Summary))
+		}
+	}
+}
+
+func showMembersOfDay(events *calendar.Events, when string) {
+	fmt.Println("showMembersOfDay()")
+	for _, i := range events.Items {
+		// If the DateTime is an empty string the Event is an all-day Event.
+		// So only Date is available.
+		if i.Start.DateTime != "" {
+			when = i.Start.DateTime
+		} else {
+			when = i.Start.Date
+		}
+		fmt.Printf("event: (%s): %q\n", when, rmSpace(i.Summary))
+	}
+}
+
+
 func main() {
 	var conf Config
 	_, err := toml.DecodeFile("./config.toml", &conf)
@@ -171,31 +199,11 @@ func main() {
 	} else {
 		fmt.Println("本日のシフトはありません")
 	}
+
+	getSameMem(events, event.Start.DateTime)
 	
-	pure_data(events,when)
+	showMembersOfDay(events,when)
 }
 
-func rmSpace(str string ) (summary string) {
-	return strings.Replace(str," ", "", -1)
-}
-
-
-func getSame(){
-
-}
-
-func pure_data(events *calendar.Events, when string) {
-	fmt.Println("pure_data")
-	for _, i := range events.Items {
-		// If the DateTime is an empty string the Event is an all-day Event.
-		// So only Date is available.
-		if i.Start.DateTime != "" {
-			when = i.Start.DateTime
-		} else {
-			when = i.Start.Date
-		}
-		fmt.Printf("event: (%s): %q\n", when, rmSpace(i.Summary))
-	}
-}
 
 
