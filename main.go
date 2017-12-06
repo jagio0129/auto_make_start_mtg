@@ -153,14 +153,14 @@ func mkTxt(membList []string) string {
 
 	txt = "# メンバ\n"
 	for _, v := range membList {
-		txt += "  - " + v + "\n"
+		txt += "- " + v + "\n"
 	}
 
 	txt += "\n"
 	txt += "# タスク内容\n"
 	for _, v := range membList {
-		txt += "  - " + v + "\n"
-		txt += "    - \n"
+		txt += "- " + v + "\n"
+		txt += "  - \n"
 	}
 
 	txt += "\n"
