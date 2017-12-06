@@ -222,19 +222,23 @@ func main() {
 	userName := myConf.User.UserName
 	canteraName := myConf.User.CanteraName
 	userHome := usr.HomeDir
-	if err != nil {
-		log.Fatal(err)
-	}
-	
+	hasPartTime := false
+
 	var event *calendar.Event
 	for _, v := range events.Items {
 		if strings.Contains(rmSpace(v.Summary), rmSpace(userName)) {
+			hasPartTime = true
 			event = v
 		}
 	}
-
-	mem := getSameMem(events, event.Start.DateTime)
-	fileName := mkFileName(userHome, canteraName, event.Start.DateTime)
-	txt := mkTxt(mem)
-	mkFile(userHome, fileName, txt)
+	if hasPartTime == false {
+		fmt.Println("本日のシフトはありません")
+	} else {
+		fmt.Println("start meetingファイルを作成します")
+		mem := getSameMem(events, event.Start.DateTime)
+		fileName := mkFileName(userHome, canteraName, event.Start.DateTime)
+		txt := mkTxt(mem)
+		mkFile(userHome, fileName, txt)
+	}
+	time.Sleep(3 * time.Second)
 }
